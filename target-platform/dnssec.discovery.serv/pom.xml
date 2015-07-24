@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.eclipse.kura</groupId>
+		<artifactId>target-platform</artifactId>
+		<version>1.2.0</version>
+	</parent>
+
+	<groupId>org.eclipse.kura</groupId>
+	<artifactId>dnssec.discovery.serv</artifactId>
+	<version>1.0.0</version>
+	<packaging>bundle</packaging>
+
+	<name>Verisign DNSSEC discovery service</name>
+	<description>Verisign library for DNSSEC discovery service</description>
+
+	<properties>
+		<maven.compiler.source>1.6</maven.compiler.source>
+		<maven.compiler.target>1.6</maven.compiler.target>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>dnssec</groupId>
+			<artifactId>dnssec.dnsjava</artifactId>
+			<version>2.1.7</version>
+			<scope>system</scope>
+			<systemPath>${basedir}/src/lib/dnsjava-2.1.7.jar</systemPath>
+		</dependency>
+		<dependency>
+			<groupId>dnssec</groupId>
+			<artifactId>dnssec.dnssecjava</artifactId>
+			<version>1.0.0</version>
+			<scope>system</scope>
+			<systemPath>${basedir}/src/lib/dnssecjava-1.0-SNAPSHOT.jar</systemPath>
+		</dependency>
+		<dependency>
+			<groupId>dnssec</groupId>
+			<artifactId>dnssec.discovery</artifactId>
+			<version>1.0</version>
+			<scope>system</scope>
+			<systemPath>${basedir}/src/lib/iot-discovery-services-1.0.jar</systemPath>
+		</dependency>
+		<dependency>
+			<groupId>dnssec</groupId>
+			<artifactId>dnssec.android</artifactId>
+			<version>0.0.0</version>
+			<scope>system</scope>
+			<systemPath>${basedir}/src/lib/android-src.jar</systemPath>
+		</dependency>
+      <!--  <dependency>
+            <groupId>dnssec</groupId>
+            <artifactId>dnssec.bcpg</artifactId>
+            <version>1.51.0</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/src/lib/bcpg-jdk15on-1.51.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>dnssec</groupId>
+            <artifactId>dnssec.bcpkix</artifactId>
+            <version>1.51.0</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/src/lib/bcpkix-jdk15on-1.51.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>dnssec</groupId>
+            <artifactId>dnssec.bcprov</artifactId>
+            <version>1.51.0</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/src/lib/bcprov-jdk15on-1.51.jar</systemPath>
+        </dependency>-->
+        <dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk15on</artifactId>
+			<version>1.51</version>
+		</dependency>
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcpkix-jdk15on</artifactId>
+			<version>1.51</version>
+		</dependency>
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcpg-jdk15on</artifactId>
+			<version>1.51</version>
+		</dependency>
+
+	</dependencies>
+
+
+	<build>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+			</resource>
+			<resource>
+				<directory>.</directory>
+				<includes>
+					<include>plugin.xml</include>
+				</includes>
+			</resource>
+		</resources>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>2.7.2</version>
+				<configuration>
+					<systemPropertyVariables>
+						<java.library.path>${project.basedir}/src/main/lib</java.library.path>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.felix</groupId>
+				<artifactId>maven-bundle-plugin</artifactId>
+				<version>2.3.5</version>
+				<extensions>true</extensions>
+				<configuration>
+					<manifestLocation>META-INF</manifestLocation>
+					<instructions>
+						<Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
+						<Bundle-Name>${project.name}</Bundle-Name>
+						<Bundle-Version>${project.version}</Bundle-Version>
+						<Include-Resource>
+							lib=${project.basedir}/src/lib
+						</Include-Resource>
+						<Import-Package>
+							sun.net.spi.nameservice;resolution:=optional, org.apache.log4j, javax.crypto.*, javax.security.auth.*, javax.naming, javax.naming.directory
+						</Import-Package>
+
+						<Export-Package>
+							com.verisign.iot.discovery.*, org.xbill.*, org.jitsi.dnssec.*, android.*,
+                            org.bouncycastle.cert.*, org.bouncycastle.operator.*, org.bouncycastle.*, org.bouncycastle.asn1.x500.*
+						</Export-Package>
+						
+						
+					</instructions>
+				</configuration>
+			</plugin>
+
+			<plugin>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>copy-dependencies</id>
+						<phase>package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+		</plugins>
+		<pluginManagement>
+			<plugins>
+				<!--This plugin's configuration is used to store Eclipse m2e settings 
+					only. It has no influence on the Maven build itself. -->
+				<plugin>
+					<groupId>org.eclipse.m2e</groupId>
+					<artifactId>lifecycle-mapping</artifactId>
+					<version>1.0.0</version>
+					<configuration>
+						<lifecycleMappingMetadata>
+							<pluginExecutions>
+								<pluginExecution>
+									<pluginExecutionFilter>
+										<groupId>
+											org.apache.maven.plugins
+										</groupId>
+										<artifactId>
+											maven-dependency-plugin
+										</artifactId>
+										<versionRange>
+											[2.1,)
+										</versionRange>
+										<goals>
+											<goal>
+												copy-dependencies
+											</goal>
+										</goals>
+									</pluginExecutionFilter>
+									<action>
+										<ignore></ignore>
+									</action>
+								</pluginExecution>
+							</pluginExecutions>
+						</lifecycleMappingMetadata>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+</project>
