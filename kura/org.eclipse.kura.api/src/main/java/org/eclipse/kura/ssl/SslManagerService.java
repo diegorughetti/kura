@@ -13,11 +13,14 @@ package org.eclipse.kura.ssl;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.security.Key;
 import java.security.PrivateKey;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 
 import javax.net.ssl.SSLSocketFactory;
+
+import org.eclipse.kura.KuraException;
 
 
 /**
@@ -111,4 +114,23 @@ public interface SslManagerService
      * 
      */
     public void installPrivateKey(String alias, PrivateKey privateKey, char[] password, Certificate[] publicCerts) throws GeneralSecurityException, IOException;
+
+    /**
+	 * returnCertificate returns the certificate corresponding to the specified alias.
+	 * 
+	 * @param alias The string used to identify the certificate in a key store
+	 * @return A Certificate object retrieved from a key store.
+	 * 
+	 */
+	public Certificate getCertificate(String alias) throws KuraException;
+	
+	/**
+	 * returnKey returns the certificate corresponding to the specified alias.
+	 * 
+	 * @param alias The string used to identify the certificate in a key store
+	 * @return A PrivateKey object retrieved from a key store.
+	 * 
+	 */
+	public Key getPrivateKey(String alias, String password) throws KuraException;
+
 }

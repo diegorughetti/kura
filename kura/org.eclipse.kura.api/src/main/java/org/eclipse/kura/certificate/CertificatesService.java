@@ -1,5 +1,6 @@
 package org.eclipse.kura.certificate;
 
+import java.security.Key;
 import java.security.cert.Certificate;
 import java.util.Enumeration;
 
@@ -69,6 +70,15 @@ public interface CertificatesService {
 	 * 
 	 */
 	public Certificate returnCertificate(String alias) throws KuraException;
+	
+	/**
+	 * returnKey returns the certificate corresponding to the specified alias.
+	 * 
+	 * @param alias The string used to identify the certificate in a key store
+	 * @return A PrivateKey object retrieved from a key store.
+	 * 
+	 */
+	public Key returnKey(String alias, String password) throws KuraException;
 	
 	/**
 	 * removeCertificate tries to remove the specified certificate from the key store. Returns true, if the removal operation succeeded. False, otherwise.

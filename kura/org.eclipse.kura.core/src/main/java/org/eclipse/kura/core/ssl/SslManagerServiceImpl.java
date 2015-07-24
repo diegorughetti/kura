@@ -26,6 +26,7 @@ import java.security.KeyStore.Entry;
 import java.security.KeyStore.LoadStoreParameter;
 import java.security.KeyStore.PasswordProtection;
 import java.security.KeyStore.ProtectionParameter;
+import java.security.Key;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
@@ -659,4 +660,92 @@ public class SslManagerServiceImpl implements SslManagerService, ConfigurableCom
 			}
 		}
 	}
+	
+	/**
+	 * returnCertificate returns the certificate corresponding to the specified alias.
+	 * 
+	 * @param alias The string used to identify the certificate in a key store
+	 * @return A Certificate object retrieved from a key store.
+	 * 
+	 */
+	
+	
+	
+	@Override
+	public Certificate getCertificate(String alias) throws KuraException{
+		
+		InputStream tsReadStream = null;
+		KeyStore ts;
+		Certificate cert;
+		try{
+			// load the trust store
+			String trustStore = m_options.getSslTrustStore();
+			ts = KeyStore.getInstance(KeyStore.getDefaultType());
+			File fTrustStore = new File(trustStore);
+			
+			if (fTrustStore.exists()) {
+				tsReadStream = new FileInputStream(trustStore);
+				ts.load(tsReadStream, null);
+			}
+			else {
+				throw KuraException.internalError("Error retrieving the certificate from the keystore");
+			}
+			
+			cert = ts.getCertificate(alias);
+			
+			if(tsReadStream != null)
+				tsReadStream.close();
+			
+		}catch (Exception e) {
+			throw KuraException.internalError("Error retrieving the certificate from the keystore");
+		}
+		
+		
+		return cert;
+		
+		
+	}
+	
+	/**
+	 * returnKey returns the certificate corresponding to the specified alias.
+	 * 
+	 * @param alias The string used to identify the certificate in a key store
+	 * @return A PrivateKey object retrieved from a key store.
+	 * 
+	 */
+	
+	
+	@Override
+	public Key getPrivateKey(String alias, String password) throws KuraException{
+		
+		InputStream tsReadStream = null;
+		KeyStore ts;
+		Key key;
+		try{
+			// load the trust store
+			String trustStore = m_options.getSslTrustStore();
+			ts = KeyStore.getInstance(KeyStore.getDefaultType());
+			File fTrustStore = new File(trustStore);
+			
+			if (fTrustStore.exists()) {
+				tsReadStream = new FileInputStream(trustStore);
+				ts.load(tsReadStream, null);
+			}
+			else {
+				throw KuraException.internalError("Error retrieving the key from the keystore");
+			}
+			
+			key = ts.getKey(alias, password.toCharArray());
+			
+			if(tsReadStream != null)
+				tsReadStream.close();
+			
+		}catch (Exception e) {
+			throw KuraException.internalError("Error retrieving the key from the keystore");
+		}
+		
+		return key;
+		
+	}
+	
 }

@@ -438,24 +438,37 @@ public class CloudServiceImpl implements CloudService, DataServiceListener, Conf
 			}
 
 
-
+			s_logger.debug("Diego: prima for");
 			for (CloudClientImpl cloudClient : m_cloudClients) {
+				s_logger.debug("Diego: prima primo if");
 				if (cloudClient.getApplicationId().equals(kuraTopic.getApplicationId())) {
+					s_logger.debug("dentro primo if, prima try");
 					try {
 						if (m_options.getTopicControlPrefix().equals(kuraTopic.getPrefix())) {
+							s_logger.debug("dentro secondo if");
 							if(m_certificatesService == null){
+								s_logger.debug("dentro terzo if");
 								ServiceReference<CertificatesService> sr= m_ctx.getBundleContext().getServiceReference(CertificatesService.class);
 								if(sr != null){
+									s_logger.debug("dentro quarto if");
 									m_certificatesService= m_ctx.getBundleContext().getService(sr);
 								}
 							}
 							boolean validMessage= false;
+							
+							s_logger.debug("kuraTopic = "+ kuraTopic);
+							s_logger.debug("kuraPayload = " + kuraPayload);
+							
+							
+							s_logger.debug("m_certificatesService = " + m_certificatesService);
 							if(m_certificatesService == null){
+								s_logger.debug("m_certificatesService == null");
 								validMessage= true;
 							}else if(m_certificatesService.verifySignature(kuraTopic, kuraPayload)){
+								s_logger.debug("passato con successo verifySignature");
 								validMessage= true;
 							}
-
+							s_logger.debug("valid message = " + validMessage);
 							if(validMessage){
 								cloudClient.onControlMessageArrived(kuraTopic.getDeviceId(), 
 										kuraTopic.getApplicationTopic(), 

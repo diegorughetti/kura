@@ -12,19 +12,26 @@
 package org.eclipse.kura.core.data.transport.mqtt;
 
 import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.security.Key;
+import java.security.PrivateKey;
+import java.security.Signature;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLSocketFactory;
+import java.security.cert.Certificate;
 
 import org.eclipse.kura.KuraConnectException;
 import org.eclipse.kura.KuraException;
 import org.eclipse.kura.KuraNotConnectedException;
 import org.eclipse.kura.KuraTimeoutException;
 import org.eclipse.kura.KuraTooManyInflightMessagesException;
+import org.eclipse.kura.certificate.CertificatesService;
 import org.eclipse.kura.configuration.ConfigurableComponent;
 import org.eclipse.kura.core.data.transport.mqtt.MqttClientConfiguration.PersistenceType;
 import org.eclipse.kura.core.util.ValidationUtil;
@@ -46,10 +53,16 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.MqttPersistenceException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.eclipse.paho.client.mqttv3.persist.MqttDefaultFilePersistence;
+import org.osgi.framework.ServiceReference;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.util.tracker.ServiceTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.verisign.iot.discovery.commons.Configurable;
+import com.verisign.iot.discovery.domain.Fqdn;
+import com.verisign.iot.discovery.domain.ServiceInstance;
+import com.verisign.iot.discovery.services.DnsServicesDiscovery;
 
 public class MqttDataTransport implements DataTransportService, MqttCallback, ConfigurableComponent, SslServiceListener {
 	private static final Logger s_logger = LoggerFactory.getLogger(MqttDataTransport.class);
@@ -89,6 +102,11 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 	private Map<String, Object> m_properties = new HashMap<String, Object>();
 
 	private CryptoService m_cryptoService;
+
+	private String m_commonName = "";
+	
+	private ComponentContext m_ctx;
+	private CertificatesService m_certificatesService;
 
 	private static final String MQTT_BROKER_URL_PROP_NAME = "broker-url";
 	private static final String MQTT_USERNAME_PROP_NAME = "username";
@@ -149,8 +167,10 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 	// ----------------------------------------------------------------
 
 	protected void activate(ComponentContext componentContext, Map<String, Object> properties) {
-		s_logger.info("Activating...");
 		
+		m_ctx = componentContext;
+		s_logger.info("Activating...");
+
 		// We need to catch the configuration exception and activate anyway.
 		// Otherwise the ConfigurationService will not be able to track us.
 		HashMap<String, Object> decryptedPropertiesMap = new HashMap<String, Object>();
@@ -174,6 +194,7 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 
 		m_properties.putAll(decryptedPropertiesMap);
 		try {
+
 			m_clientConf = buildConfiguration(m_properties);
 			setupMqttSession();
 		} catch (RuntimeException e) {
@@ -211,7 +232,7 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 
 	public void updated(Map<String, Object> properties) {
 		s_logger.info("Updating...");
-		
+
 		m_properties.clear();
 
 		HashMap<String, Object> decryptedPropertiesMap = new HashMap<String, Object>();
@@ -279,6 +300,8 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 			throw new IllegalStateException("Invalid configuration");
 			// TODO: define an KuraRuntimeException
 		}
+
+
 
 		s_logger.info("# ------------------------------------------------------------");
 		s_logger.info("#  Connection Properties");
@@ -629,6 +652,49 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 	 */
 	private MqttClientConfiguration buildConfiguration(Map<String, Object> properties) {
 
+
+		// DIEGO
+		s_logger.info("commonName = " + properties.get("dnssecDeviceId"));
+		
+		if(properties.get("dnssecDeviceId") != null){
+			m_commonName = (String) properties.get("dnssecDeviceId");
+		}
+
+		Fqdn domainName = new Fqdn("6rvhwxg4yqfa.1.iotverisign.com");
+		String dnsserver = "198.41.1.1";
+		boolean checkDnssec = true;
+		DnsServicesDiscovery discoverer = new DnsServicesDiscovery();
+
+		boolean isProvisioning = false;
+
+		try{
+
+			Configurable c = discoverer.dnsServer(InetAddress.getByName(dnsserver));
+			s_logger.info("dopo dnsServer");
+			Set<ServiceInstance> discoveryResult = discoverer.listServiceInstances(domainName, properties.get(MQTT_BROKER_URL_PROP_NAME).toString(), checkDnssec);
+
+			isProvisioning = (properties.get(MQTT_BROKER_URL_PROP_NAME).toString()).equals("provisioning");
+
+			s_logger.info("dopo listServiceInstances");
+			Iterator<ServiceInstance> i = discoveryResult.iterator();
+			s_logger.info("dopo iterator");
+			ServiceInstance si = i.next();
+			s_logger.info("dopo next");
+			String host = si.getServiceRecord().getHost();
+			host = host.substring(0,host.length()-1);
+			s_logger.info("Host: " + host);
+			int port = si.getServiceRecord().getPort();
+			s_logger.info("Port: " + port);
+			s_logger.info(properties.get(MQTT_BROKER_URL_PROP_NAME).toString()+"://"+host+":"+port+"/");
+			//m_properties.remove("brokerUrl");
+			properties.put(MQTT_BROKER_URL_PROP_NAME, "mqtts://"+host+":"+port+"/");
+
+		}catch (Exception e){
+			s_logger.info(e.getMessage());
+			e.printStackTrace();
+		}
+
+
 		MqttClientConfiguration clientConfiguration = null;
 		MqttConnectOptions conOpt = new MqttConnectOptions();
 		String clientId = null;
@@ -647,20 +713,20 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 			clientId = clientId.replace('+', '-');
 			clientId = clientId.replace('#', '-');
 
-			
+
 			// Configure the broker URL
 			brokerUrl = (String) properties.get(MQTT_BROKER_URL_PROP_NAME);
 			ValidationUtil.notEmptyOrNull(brokerUrl, MQTT_BROKER_URL_PROP_NAME);
 			brokerUrl = brokerUrl.trim();
-			
+
 			if( isSecuredEnvironment() && brokerUrl.contains(MQTT_SCHEME)){
 				s_logger.error("Secure (mqtts) connection required!");
 				throw KuraException.internalError("Secure (mqtts) connection required!");
-				
+
 			}
 			brokerUrl = brokerUrl.replaceAll("^" + MQTT_SCHEME, "tcp://");
 			brokerUrl = brokerUrl.replaceAll("^" + MQTTS_SCHEME, "ssl://"); 
-			
+
 			brokerUrl = brokerUrl.replaceAll("/$", "");
 			ValidationUtil.notEmptyOrNull(brokerUrl, "brokerUrl");
 
@@ -745,6 +811,61 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 
 		clientConfiguration = new MqttClientConfiguration(brokerUrl, clientId, persistenceType, conOpt);
 
+		// diego
+		s_logger.info("isProvisioning = " + isProvisioning);
+		if(!isProvisioning){
+			s_logger.info("dentro if");
+			
+			ServiceReference<CertificatesService> sr= m_ctx.getBundleContext().getServiceReference(CertificatesService.class);
+			s_logger.info("service reference = " +sr);
+			if(sr != null){
+				m_certificatesService= m_ctx.getBundleContext().getService(sr);
+			}
+			s_logger.info("certificateService = " + m_certificatesService);
+			s_logger.info("properites = " + m_ctx.getProperties());
+			s_logger.info("properites.dnssecDeviceId = " + (String) m_ctx.getProperties().get("dnssecDeviceId"));
+			String certAlias = m_commonName;
+			s_logger.info("certAlias = " + certAlias);
+
+
+			try{
+				
+				Certificate certssl = m_sslManagerService.getCertificate(certAlias);
+				s_logger.info("certssl = " + certssl);
+				Key keyssl = m_sslManagerService.getPrivateKey(certAlias, "Welcome1");
+				s_logger.info("keyssl = " + keyssl);
+				String newUsername = clientConfiguration.getConnectOptions().getUserName().concat("." + certAlias);
+				s_logger.info("newUsername = " + newUsername);
+				clientConfiguration.getConnectOptions().setUserName(newUsername);
+
+				Signature s = Signature.getInstance("SHA256withRSA");
+				s_logger.info("signature = " +s);
+
+				if(keyssl instanceof PrivateKey)
+					s.initSign((PrivateKey) keyssl);
+				else
+					throw new KuraConnectException(null, "Error retrieving key for password signature");
+
+				s.update(newUsername.getBytes());
+
+				byte [] password = s.sign();
+				
+				s_logger.info("dopo Sign - lenght = " + password.length);
+				char [] pwd = new char[password.length];
+				for(int i=0; i<password.length; i++){
+					pwd[i]= (char) password[i];
+				}
+				
+//				clientConfiguration.getConnectOptions().setPassword((new String(password, "UTF-8")).toCharArray());
+				
+				clientConfiguration.getConnectOptions().setPassword(pwd);
+				
+				s_logger.info("#  password  = " + new String(clientConfiguration.getConnectOptions().getPassword()));
+			}catch(Exception e){
+				e.printStackTrace();
+				//throw new KuraConnectException(e, "Error retrieving key for password signature");
+			}
+		}
 		return clientConfiguration;
 	}
 
@@ -805,7 +926,12 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 		// We also need to construct a new instance if the persistence type (file or memory) changes.
 		// We MUST avoid to construct a new client instance every time because
 		// in that case the MQTT message ID is reset to 1.
+		
+		s_logger.info("m_clientconf.user = " + m_clientConf.getConnectOptions().getUserName());
+		s_logger.info("m_clientconf.pwd = " + new String(m_clientConf.getConnectOptions().getPassword()));
+		
 		if (m_mqttClient != null) {
+			
 			String brokerUrl = m_mqttClient.getServerURI();
 			String clientId = m_mqttClient.getClientId();
 

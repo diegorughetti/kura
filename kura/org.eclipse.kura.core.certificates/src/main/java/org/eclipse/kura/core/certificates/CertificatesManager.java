@@ -23,6 +23,7 @@ import org.eclipse.kura.message.KuraTopic;
 import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.security.Key;
 
 /*
  * 
@@ -74,6 +75,18 @@ public final class CertificatesManager implements CertificatesService{
 			return ks.getCertificate(alias);
 		} catch (Exception e) {
 			throw KuraException.internalError("Error retrieving the certificate from the keystore");
+		}
+	}
+	
+	@Override
+	public Key returnKey(String alias, String password) throws KuraException{
+		KeyStore ks= null;
+		try {
+			char[] keystorePassword= m_cryptoService.getKeyStorePassword(DEFAULT_KEYSTORE);
+			ks= KeyStoreManagement.loadKeyStore(keystorePassword);
+			return ks.getKey(alias, password.toCharArray());
+		} catch (Exception e) {
+			throw KuraException.internalError("Error retrieving the key from the keystore");
 		}
 	}
 
