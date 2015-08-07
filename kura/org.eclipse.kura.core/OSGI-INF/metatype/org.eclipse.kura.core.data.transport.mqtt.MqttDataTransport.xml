@@ -18,6 +18,14 @@
          description="The MqttDataTransport provides an MQTT connection. Its configuration parameters are used to determine the MQTT broker and the credentials to connect to the broker.">
 
         <Icon resource="MqttDataTransport" size="32"/>
+        
+        <AD id="broker-url-discovery"
+            name="broker-url-discovery"
+            type="Boolean"
+            cardinality="0"
+            required="true"
+            default="false"
+            description="If this feature is enabled the device will retrieve the broker url from a remote discovery service. Otherwise the device will use the url into the broker-url field"/>
                 
         <AD id="broker-url"
             name="broker-url"
@@ -26,7 +34,15 @@
             required="true"
             default="mqtt://broker-url:1883/" 
             description="URL of the mqtt broker to connect to, for example, mqtt://broker-sandbox.everyware-cloud.com:1883/ or mqtts://broker-sandbox.everyware-cloud.com:8883/."/>
-
+		
+		<AD id="common-name"
+            name="common-name"
+            type="String"
+            cardinality="0"
+            required="false"
+            default=""
+            description="The value of this attribute is used to retrieve the public key for the authentication from the DNSSEC server"/>
+		
         <AD id="topic.context.account-name"
             name="topic.context.account-name"
             type="String"

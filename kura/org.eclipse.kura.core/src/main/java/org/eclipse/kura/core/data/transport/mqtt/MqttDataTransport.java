@@ -104,11 +104,13 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 	private CryptoService m_cryptoService;
 
 	private String m_commonName = "";
-	
+
 	private ComponentContext m_ctx;
 	private CertificatesService m_certificatesService;
 
 	private static final String MQTT_BROKER_URL_PROP_NAME = "broker-url";
+	private static final String MQTT_BROKER_URL_PROP_DISCOVERY = "broker-url-discovery";
+	private static final String MQTT_COMMON_NAME = "common-name";
 	private static final String MQTT_USERNAME_PROP_NAME = "username";
 	private static final String MQTT_PASSWORD_PROP_NAME = "password";
 	private static final String MQTT_CLIENT_ID_PROP_NAME = "client-id";
@@ -122,6 +124,9 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 	private static final String MQTT_LWT_RETAIN_PROP_NAME = "lwt.retain";
 	private static final String MQTT_LWT_TOPIC_PROP_NAME = "lwt.topic";
 	private static final String MQTT_LWT_PAYLOAD_PROP_NAME = "lwt.payload";
+	
+	private static final String PROVISIONED_PROP_NAME = "provisioned";
+	private static final String BROKER_URL_PROP_DISCOVERY = "prov-broker-url-discovery";
 
 	private static final String CLOUD_ACCOUNT_NAME_PROP_NAME = "topic.context.account-name";
 
@@ -167,7 +172,7 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 	// ----------------------------------------------------------------
 
 	protected void activate(ComponentContext componentContext, Map<String, Object> properties) {
-		
+
 		m_ctx = componentContext;
 		s_logger.info("Activating...");
 
@@ -238,8 +243,14 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 		HashMap<String, Object> decryptedPropertiesMap = new HashMap<String, Object>();
 
 		Iterator<String> keys = properties.keySet().iterator();
+		String commonName ="";
 		while (keys.hasNext()) {
 			String key = keys.next();
+			if(MQTT_COMMON_NAME.equals(key)){
+				s_logger.info("PORCO = " + properties.get(key));
+				commonName = properties.get(key).toString();
+				s_logger.info("PORCO = " + commonName);
+			}
 			Object value = properties.get(key);
 			if (key.equals(MQTT_PASSWORD_PROP_NAME)) {
 				try {
@@ -255,7 +266,8 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 		}
 
 		m_properties.putAll(decryptedPropertiesMap);
-
+		
+		m_properties.put(MQTT_COMMON_NAME, commonName);
 		update();
 	}
 
@@ -654,47 +666,75 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 
 
 		// DIEGO
-		s_logger.info("commonName = " + properties.get("dnssecDeviceId"));
-		
-		if(properties.get("dnssecDeviceId") != null){
-			m_commonName = (String) properties.get("dnssecDeviceId");
+		s_logger.info("commonName = " + properties.get(MQTT_COMMON_NAME));
+
+		if(properties.get(MQTT_COMMON_NAME) != null && properties.get(MQTT_COMMON_NAME) != ""){
+			m_commonName = (String) properties.get(MQTT_COMMON_NAME);
 		}
+		
+		s_logger.info("m_commonName_2 = " + m_commonName);
 
 		Fqdn domainName = new Fqdn("6rvhwxg4yqfa.1.iotverisign.com");
+		s_logger.info("m_commonName_3 = " + m_commonName);
 		String dnsserver = "198.41.1.1";
 		boolean checkDnssec = true;
+		s_logger.info("creating discoverer");
+		
 		DnsServicesDiscovery discoverer = new DnsServicesDiscovery();
-
+		
+		s_logger.info("PROVISIONED_PROP_NAME_2 = " + properties.get(PROVISIONED_PROP_NAME));
 		boolean isProvisioning = false;
-
-		try{
-
-			Configurable c = discoverer.dnsServer(InetAddress.getByName(dnsserver));
-			s_logger.info("dopo dnsServer");
-			Set<ServiceInstance> discoveryResult = discoverer.listServiceInstances(domainName, properties.get(MQTT_BROKER_URL_PROP_NAME).toString(), checkDnssec);
-
-			isProvisioning = (properties.get(MQTT_BROKER_URL_PROP_NAME).toString()).equals("provisioning");
-
-			s_logger.info("dopo listServiceInstances");
-			Iterator<ServiceInstance> i = discoveryResult.iterator();
-			s_logger.info("dopo iterator");
-			ServiceInstance si = i.next();
-			s_logger.info("dopo next");
-			String host = si.getServiceRecord().getHost();
-			host = host.substring(0,host.length()-1);
-			s_logger.info("Host: " + host);
-			int port = si.getServiceRecord().getPort();
-			s_logger.info("Port: " + port);
-			s_logger.info(properties.get(MQTT_BROKER_URL_PROP_NAME).toString()+"://"+host+":"+port+"/");
-			//m_properties.remove("brokerUrl");
-			properties.put(MQTT_BROKER_URL_PROP_NAME, "mqtts://"+host+":"+port+"/");
-
-		}catch (Exception e){
-			s_logger.info(e.getMessage());
-			e.printStackTrace();
+		
+		if(properties.get(PROVISIONED_PROP_NAME) != null){
+			
+			isProvisioning = !(Boolean.valueOf(properties.get(PROVISIONED_PROP_NAME).toString()));
 		}
+		s_logger.info("isProvisioning_2 = " + isProvisioning);
+		
+		boolean isDiscovery = false;
+		
+		s_logger.info("MQTT_BROKER_URL_PROP_DISCOVERY_2 = " +  properties.get(MQTT_BROKER_URL_PROP_DISCOVERY));
+		s_logger.info("BROKER_URL_PROP_DISCOVERY_2 = " +  properties.get(BROKER_URL_PROP_DISCOVERY));
+		
+		if(isProvisioning)
+			isDiscovery = (Boolean) properties.get(BROKER_URL_PROP_DISCOVERY);
+		else
+			isDiscovery = (Boolean) properties.get(MQTT_BROKER_URL_PROP_DISCOVERY);
+		
+		
+		if(isDiscovery){
+			try{
 
+				Configurable c = discoverer.dnsServer(InetAddress.getByName(dnsserver));
+				s_logger.info("dopo dnsServer");
+				
+				Set<ServiceInstance> discoveryResult;
+				if(isProvisioning)
+					discoveryResult = discoverer.listServiceInstances(domainName, "provisioning", checkDnssec);
+				else
+					discoveryResult = discoverer.listServiceInstances(domainName, "mqtts", checkDnssec);
+				
+				s_logger.info("dopo listServiceInstances");
+				Iterator<ServiceInstance> i = discoveryResult.iterator();
+				s_logger.info("dopo iterator");
+				ServiceInstance si = i.next();
+				s_logger.info("dopo next");
+				String host = si.getServiceRecord().getHost();
+				host = host.substring(0,host.length()-1);
+				s_logger.info("Host: " + host);
+				int port = si.getServiceRecord().getPort();
+				s_logger.info("Port: " + port);
+				s_logger.info("mqtts://"+host+":"+port+"/");
+				//m_properties.remove("brokerUrl");
+				properties.put(MQTT_BROKER_URL_PROP_NAME, "mqtts://"+host+":"+port+"/");
 
+			}catch (Exception e){
+				s_logger.info(e.getMessage());
+				e.printStackTrace();
+			}
+
+		}
+		
 		MqttClientConfiguration clientConfiguration = null;
 		MqttConnectOptions conOpt = new MqttConnectOptions();
 		String clientId = null;
@@ -782,6 +822,7 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 				conOpt.setWill(willTopic, payload, willQos, willRetain);
 			}
 		} catch (KuraException e) {
+			e.printStackTrace();
 			s_logger.error("Invalid configuration");
 			throw new IllegalStateException("Invalid MQTT client configuration", e);
 		}
@@ -815,7 +856,7 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 		s_logger.info("isProvisioning = " + isProvisioning);
 		if(!isProvisioning){
 			s_logger.info("dentro if");
-			
+
 			ServiceReference<CertificatesService> sr= m_ctx.getBundleContext().getServiceReference(CertificatesService.class);
 			s_logger.info("service reference = " +sr);
 			if(sr != null){
@@ -823,13 +864,13 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 			}
 			s_logger.info("certificateService = " + m_certificatesService);
 			s_logger.info("properites = " + m_ctx.getProperties());
-			s_logger.info("properites.dnssecDeviceId = " + (String) m_ctx.getProperties().get("dnssecDeviceId"));
+			s_logger.info("properites.common-name = " + (String) m_ctx.getProperties().get(MQTT_COMMON_NAME));
 			String certAlias = m_commonName;
 			s_logger.info("certAlias = " + certAlias);
 
 
 			try{
-				
+
 				Certificate certssl = m_sslManagerService.getCertificate(certAlias);
 				s_logger.info("certssl = " + certssl);
 				Key keyssl = m_sslManagerService.getPrivateKey(certAlias, "Welcome1");
@@ -849,17 +890,17 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 				s.update(newUsername.getBytes());
 
 				byte [] password = s.sign();
-				
+
 				s_logger.info("dopo Sign - lenght = " + password.length);
 				char [] pwd = new char[password.length];
 				for(int i=0; i<password.length; i++){
 					pwd[i]= (char) password[i];
 				}
-				
-//				clientConfiguration.getConnectOptions().setPassword((new String(password, "UTF-8")).toCharArray());
-				
+
+				//				clientConfiguration.getConnectOptions().setPassword((new String(password, "UTF-8")).toCharArray());
+
 				clientConfiguration.getConnectOptions().setPassword(pwd);
-				
+
 				s_logger.info("#  password  = " + new String(clientConfiguration.getConnectOptions().getPassword()));
 			}catch(Exception e){
 				e.printStackTrace();
@@ -926,12 +967,11 @@ public class MqttDataTransport implements DataTransportService, MqttCallback, Co
 		// We also need to construct a new instance if the persistence type (file or memory) changes.
 		// We MUST avoid to construct a new client instance every time because
 		// in that case the MQTT message ID is reset to 1.
-		
+
 		s_logger.info("m_clientconf.user = " + m_clientConf.getConnectOptions().getUserName());
-		s_logger.info("m_clientconf.pwd = " + new String(m_clientConf.getConnectOptions().getPassword()));
-		
+
 		if (m_mqttClient != null) {
-			
+
 			String brokerUrl = m_mqttClient.getServerURI();
 			String clientId = m_mqttClient.getClientId();
 
