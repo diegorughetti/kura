@@ -39,7 +39,7 @@
             name="common-name"
             type="String"
             cardinality="0"
-            required="false"
+            required="true"
             default=""
             description="The value of this attribute is used to retrieve the public key for the authentication from the DNSSEC server"/>
 		
